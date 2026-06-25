@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Do Re Mi 連連看</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background: #FAFAF8;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+    .card {
+      background: white;
+      border-radius: 18px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      padding: 28px 24px 24px;
+      max-width: 400px;
+      width: 100%;
+    }
+    .title { font-size: 20px; font-weight: 600; color: #1a1a1a; margin-bottom: 4px; }
+    .sub { font-size: 14px; color: #888; margin-bottom: 1.4rem; }
+    .arena {
+      position: relative;
+      width: 340px;
+      height: 340px;
+      margin: 0 auto;
+    }
+    .note-tag {
+      position: absolute;
+      width: 52px; height: 52px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 15px; font-weight: 500;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.12s;
+      z-index: 20;
+    }
+    .note-tag:hover { transform: scale(1.1); }
+    .note-tag.selected { box-shadow: 0 0 0 3px #888; transform: scale(1.12); }
+    .note-tag.matched { opacity: 0.35; pointer-events: none; }
+    .note-tag.wrong { animation: shk 0.3s; }
+    .tag-Do { background: #E6F1FB; color: #0C447C; border-color: #378ADD; }
+    .tag-Re { background: #FAECE7; color: #712B13; border-color: #D85A30; }
+    .tag-Mi { background: #EEEDFE; color: #3C3489; border-color: #7F77DD; }
+    .key-zone {
+      position: absolute;
+      cursor: pointer;
+      border: 2.5px dashed #ccc;
+      border-radius: 6px;
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 8px;
+      font-size: 13px; color: #bbb;
+      transition: background 0.15s, border-color 0.15s;
+      z-index: 5;
+    }
+    .key-zone:hover { border-color: #999; background: rgba(0,0,0,0.03); }
+    .key-zone.matched-zone { border-style: solid; pointer-events: none; }
+    .key-zone.zone-Do.matched-zone { border-color: #378ADD; background: rgba(55,138,221,0.10); color: #378ADD; }
+    .key-zone.zone-Re.matched-zone { border-color: #D85A30; background: rgba(216,90,48,0.10); color: #D85A30; }
+    .key-zone.zone-Mi.matched-zone { border-color: #7F77DD; background: rgba(127,119,221,0.10); color: #7F77DD; }
+    .key-zone.wrong-zone { animation: shk 0.3s; border-color: #E24B4A; }
+    @keyframes shk {
+      0%,100%{ transform: translateX(0); }
+      25%{ transform: translateX(-5px); }
+      75%{ transform: translateX(5px); }
+    }
+    .score-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 1.2rem;
+      font-size: 14px; color: #888;
+    }
+    .score-num { font-size: 20px; font-weight: 600; color: #1a1a1a; }
+    .reset-btn {
+      margin-left: auto;
+      font-size: 13px; padding: 6px 16px;
+      cursor: pointer;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      background: white; color: #333;
+    }
+    .reset-btn:hover { background: #f5f5f5; }
+    .win-msg {
+      display: none;
+      text-align: center;
+      font-size: 15px; font-weight: 500;
+      color: #0F6E56;
+      padding: 10px;
+      background: #E1F5EE;
+      border-radius: 10px;
+      margin-top: 1rem;
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+  <p class="title">Do Re Mi 連連看</p>
+  <p class="sub">點選音符，再點鋼琴上對應的琴鍵！</p>
+
+  <div class="arena" id="arena">
+    <svg id="lineSvg" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:15;"></svg>
+
+    <!-- Piano: 3 white keys, each 72px wide, total 216px, centered in 340px arena → left offset 62 -->
+    <svg style="position:absolute;left:62px;top:100px;z-index:3;" width="216" height="140" viewBox="0 0 216 140" xmlns="http://www.w3.org/2000/svg">
+      <rect x="1" y="1" width="214" height="138" rx="10" fill="white" stroke="#222" stroke-width="3"/>
+      <line x1="72" y1="1" x2="72" y2="139" stroke="#222" stroke-width="2"/>
+      <line x1="144" y1="1" x2="144" y2="139" stroke="#222" stroke-width="2"/>
+      <rect x="46" y="1" width="34" height="82" rx="4" fill="#111"/>
+      <rect x="136" y="1" width="34" height="82" rx="4" fill="#111"/>
+    </svg>
+
+    <!-- Clickable zones over each white key -->
+    <div class="key-zone zone-Do" id="zone-Do" style="left:62px;top:100px;width:72px;height:140px;" onclick="onZoneClick('Do',this)">Do?</div>
+    <div class="key-zone zone-Re" id="zone-Re" style="left:134px;top:100px;width:72px;height:140px;" onclick="onZoneClick('Re',this)">Re?</div>
+    <div class="key-zone zone-Mi" id="zone-Mi" style="left:206px;top:100px;width:72px;height:140px;" onclick="onZoneClick('Mi',this)">Mi?</div>
+  </div>
+
+  <div class="score-bar">
+    <span>配對：</span>
+    <span class="score-num" id="scoreNum">0</span>
+    <span>/ 8</span>
+    <button class="reset-btn" onclick="resetGame()">重新開始</button>
+  </div>
+  <div class="win-msg" id="winMsg">🎉 全部配對完成！真棒！</div>
+</div>
+
+<script>
+const tagDefs = [
+  {key:'Do', cx:18,  cy:108},
+  {key:'Do', cx:18,  cy:195},
+  {key:'Do', cx:18,  cy:272},
+  {key:'Re', cx:110, cy:30 },
+  {key:'Re', cx:215, cy:30 },
+  {key:'Re', cx:310, cy:195},
+  {key:'Mi', cx:135, cy:320},
+  {key:'Mi', cx:310, cy:108},
+];
+
+const zoneCenters = {
+  Do: {x: 98,  y: 170},
+  Re: {x: 170, y: 170},
+  Mi: {x: 242, y: 170},
+};
+
+const strokeColors = { Do:'#378ADD', Re:'#D85A30', Mi:'#7F77DD' };
+const matchCount   = { Do:0, Re:0, Mi:0 };
+const maxMatch     = { Do:3, Re:3, Mi:2 };
+
+let selected = null;
+let score    = 0;
+
+function resetGame(){
+  selected = null; score = 0;
+  matchCount.Do = matchCount.Re = matchCount.Mi = 0;
+  document.getElementById('scoreNum').textContent = '0';
+  document.getElementById('winMsg').style.display = 'none';
+  document.getElementById('lineSvg').innerHTML = '';
+  ['Do','Re','Mi'].forEach(k => {
+    const z = document.getElementById('zone-'+k);
+    z.className = 'key-zone zone-'+k;
+    z.textContent = k+'?';
+  });
+  buildTags();
+}
+
+function buildTags(){
+  document.querySelectorAll('.note-tag').forEach(e => e.remove());
+  const arena = document.getElementById('arena');
+  tagDefs.forEach((t, i) => {
+    const d = document.createElement('div');
+    d.className = 'note-tag tag-'+t.key;
+    d.textContent = t.key;
+    d.id = 'tag-'+i;
+    d.style.left = (t.cx - 26)+'px';
+    d.style.top  = (t.cy - 26)+'px';
+    d.addEventListener('click', () => onTagClick(i, t, d));
+    arena.appendChild(d);
+  });
+}
+
+function onTagClick(i, t, el){
+  if(el.classList.contains('matched')) return;
+  document.querySelectorAll('.note-tag').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  selected = {i, t, el};
+}
+
+function onZoneClick(key, zoneEl){
+  if(!selected) return;
+  if(zoneEl.classList.contains('matched-zone')) return;
+
+  if(selected.t.key === key){
+    const tc = {x: selected.t.cx, y: selected.t.cy};
+    const zc = zoneCenters[key];
+    drawLine(tc.x, tc.y, zc.x, zc.y, strokeColors[key]);
+    selected.el.classList.add('matched');
+    selected.el.classList.remove('selected');
+    matchCount[key]++;
+    score++;
+    document.getElementById('scoreNum').textContent = score;
+    if(matchCount[key] >= maxMatch[key]){
+      zoneEl.classList.add('matched-zone');
+      zoneEl.textContent = key + ' ✓';
+    }
+    selected = null;
+    if(score === 8) document.getElementById('winMsg').style.display = 'block';
+  } else {
+    selected.el.classList.add('wrong');
+    zoneEl.classList.add('wrong-zone');
+    setTimeout(() => {
+      if(selected) selected.el.classList.remove('wrong');
+      zoneEl.classList.remove('wrong-zone');
+    }, 350);
+  }
+}
+
+function drawLine(x1,y1,x2,y2,stroke){
+  const svg = document.getElementById('lineSvg');
+  const ln = document.createElementNS('http://www.w3.org/2000/svg','line');
+  ln.setAttribute('x1',x1); ln.setAttribute('y1',y1);
+  ln.setAttribute('x2',x2); ln.setAttribute('y2',y2);
+  ln.setAttribute('stroke', stroke);
+  ln.setAttribute('stroke-width','3');
+  ln.setAttribute('stroke-linecap','round');
+  ln.setAttribute('opacity','0.75');
+  svg.appendChild(ln);
+}
+
+resetGame();
+</script>
+</body>
+</html>
